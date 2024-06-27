@@ -1,13 +1,81 @@
-# advanced-rag-amazon-opensearch
-Advanced RAG workshop with Amazon OpenSearch Service.
 
-This is a workshop that demonstrate how Amazon OpenSearch Service and Amazon Bedrock service can be used to create a Retrieval augmented generation application architecture. The workshops contains 3 python notebooks each building a wine recommendation chatbot. 
+# Data foundation for Gen AI - AWS Vector databases (AWS workshop)
 
-Notebook 1 - Demonstrate how we can use AWS SDK to build RAG architecture by using Amazon Bedrock titan v2 model and Amazon OpenSearch service. In this workshop we use python SDK to call each of these services.
+This repository contains code examples and notebooks for building Retrieval Augmented Generative (RAG) AI applications using various AWS vector database options. The notebooks demonstrate how to leverage the power of AWS vector databases to build efficient and scalable data foundations for RAG models, enabling the generation of accurate, contextual, and knowledge-grounded outputs.
 
-Notebook 2 - Demonstrate how you can leverage Neural search feature from opensearch to call Amazon Bedrock titan v2 model without having to call it through python SDK. This gives away the heavy lifting of converting text to vector embeddings in python code and leaves the developer to just write code for loading text data and call search with a text query only. Amazon Opensearch service will take care of the converting text to vectors. In this notebook we continue to use Anthropic Claude sonnet model from Amazon Bedrock through our AWS SDK code.
+## Overview
 
-Notebook 3 - Demonstrate how you can use the Flow framework from OpenSearch to develop a complete RAG architecture with just a single API call. We create a workflow that contains all the steps including deploying connectors for Amazon Titan v2 and Anthropic claude model, we setup an index, and create a pipeline that takes care of converting text to vector at the time of ingest and query, and we deploy a RAG Tool that will help us chain all the steps in RAG architecture through a single agent execution. This shows how you can use opensearch to take away the heavy lifting and create quick chatbots over your knowledge bases without having to write much code in python.
+Retrieval Augmented Generative AI combines the generative capabilities of large language models with the ability to retrieve and incorporate relevant information from external knowledge sources. This approach enhances the factual accuracy and domain awareness of the generated content by augmenting the generative model with retrieved knowledge.
+
+AWS offers a diverse range of vector database options, each with its unique features and capabilities, allowing developers to choose the solution that best fits their specific needs and existing skills. This repository provides examples and code for the following AWS vector database options:
+
+- **OpenSearch**
+- **PostgreSQL with pg_vector**
+- **SQL Server**
+- **Amazon DocumentDB (MongoDB-compatible)**
+- **Amazon MemoryDB (Redis-compatible)**
+
+## Repository Structure
+
+The repository is structured as follows:
+
+```
+data-foundation-gen-ai-aws-vector-stores/
+├── lab1-rag/
+│   ├── opensearch/
+│   ├── pg_vector/
+│   ├── sql_server/
+│   ├── documentdb/
+│   └── memorydb/
+├── data/
+│   └── ... (sample data files)
+├── utils/
+│   └── ... (utility scripts and functions)
+├── requirements.txt
+└── README.md
+```
+
+- The `lab1-rag/` directory contains Jupyter Notebooks for building RAG use case using you choice of AWS vector database, demonstrating how to set up, configure, and use the vector database for the use case.
+- The `data/` directory holds sample data files used in the notebooks for demonstration purposes.
+- The `utils/` directory contains utility scripts and functions shared across the notebooks.
+- The `requirements.txt` file lists the Python dependencies required to run the notebooks.
+
+## Getting Started
+
+To get started with this repository, follow these steps:
+
+1. Clone the repository to your local machine or AWS Cloud9 environment.
+2. Install the required dependencies by running `pip install -r requirements.txt`.
+3. Launch an Amazon SageMaker notebook instance or use your existing instance.
+4. Open the relevant notebook from the `lab1-rag/` directory based on the AWS vector database option you want to explore.
+5. Follow the instructions and code examples in the notebook to set up the vector database, ingest and preprocess data, and build and evaluate a RAG model.
+
+## Usage
+
+Each notebook in the `lab1-rag/` directory provides a step-by-step guide and code examples for building a RAG use case using the respective AWS vector database. The notebooks cover the following aspects:
+
+- Setting up and configuring the vector database
+- Ingesting and preprocessing data
+- Creating vector embeddings
+- Indexing and storing vector data in the vector database
+- Implementing similarity search and nearest neighbor queries
+- Building and evaluating a RAG model
+- Integrating with other AWS services (e.g., AWS Bedrock, Amazon SageMaker)
+
+Feel free to modify the code and data to suit your specific use case or experiment with different configurations and settings.
+
+## Contributing
+
+Contributions to this repository are welcome! If you have improvements, bug fixes, or additional examples to share, please submit a pull request. For major changes, it's recommended to open an issue first for discussion.
+
+## License
+
+This repository is licensed under the [Amazon License](https://aws.amazon.com/asl/).
+
+## Resources
+
+- [AWS Vector Stores for Retrieval Augmented Generative AI (Workshop Documentation)](link-to-workshop-docs)
+- [AWS Documentation on Vector Stores](link-to-aws-docs)
 
 
-You can launch python notebook to walk through each lab
+This README provides an overview of the repository, instructions for getting started, and guidance on how to use the provided notebooks and code examples. It also includes information on contributing, licensing, and additional resources related to AWS vector databases and Retrieval Augmented Generative AI.

@@ -27,6 +27,8 @@ data-foundation-gen-ai-aws-vector-stores/
 │   ├── sql_server/
 │   ├── documentdb/
 │   └── memorydb/
+├── cfn/
+│   └── ... (cloudformation templates)
 ├── data/
 │   └── ... (sample data files)
 ├── utils/
@@ -36,6 +38,7 @@ data-foundation-gen-ai-aws-vector-stores/
 ```
 
 - The `lab1-rag/` directory contains Jupyter Notebooks for building RAG use case using you choice of AWS vector database, demonstrating how to set up, configure, and use the vector database for the use case.
+- The `cfn/` directory holds the cloudformation template that can be deployed to provision resources for this workshop. Please note that this will incur cost. Please study the cloudformation resources in the template and understand their associated cost before deploying in your account.
 - The `data/` directory holds sample data files used in the notebooks for demonstration purposes.
 - The `utils/` directory contains utility scripts and functions shared across the notebooks.
 - The `requirements.txt` file lists the Python dependencies required to run the notebooks.

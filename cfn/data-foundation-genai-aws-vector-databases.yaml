@@ -7,25 +7,25 @@ Metadata:
       - Label:
           default: Required Parameters
         Parameters:
-          - OpenSearchUsername
-          - OpenSearchPassword
+          - DBUsername
+          - DBPassword
     ParameterLabels:
-      OpenSearchUsername:
-        default: OpenSearch cluster username
-      OpenSearchPassword:
-        default: OpenSearch cluster password
+      DBUsername:
+        default: DB cluster username
+      DBPassword:
+        default: DB cluster password
       SageMakerNotebookName:
         default: Name of SageMaker Notebook Instance
       
 Parameters:
-  OpenSearchUsername:
+  DBUsername:
     AllowedPattern: '^[a-zA-Z0-9]+$'
     Default: master
-    Description: User name for the account that will be added to the OpenSearch cluster.
+    Description: User name for the account that will be added to the DB cluster.
     MaxLength: '25'
     MinLength: '5'
     Type: String
-  OpenSearchPassword:
+  DBPassword:
     AllowedPattern: '(?=^.{8,32}$)((?=.*\d)(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[^A-Za-z0-9])(?=.*[a-z])|(?=.*[^A-Za-z0-9])(?=.*[A-Z])(?=.*[a-z])|(?=.*\d)(?=.*[A-Z])(?=.*[^A-Za-z0-9]))^.*'
     Description: Password for the account named above. Must be at least 8 characters containing letters, numbers and symbols
     MaxLength: '32'
@@ -38,18 +38,18 @@ Parameters:
 
 Resources:
 
-  OpenSearchSecret:
+  DBSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
-      Name: !Sub OpenSearchSecret-${AWS::StackName}
-      Description: OpenSearch username and password
-      SecretString: !Sub '{ "username" : "${OpenSearchUsername}", "password" : "${OpenSearchPassword}" }'
+      Name: !Sub DBSecret-${AWS::StackName}
+      Description: DB username and password
+      SecretString: !Sub '{ "username" : "${DBUsername}", "password" : "${DBPassword}" }'
 
   CodeRepository:
     Type: AWS::SageMaker::CodeRepository
     Properties:
       GitConfig:
-        RepositoryUrl: https://github.com/mohdaliiqbal/data-foundation-gen-ai-aws-vector-databases
+        RepositoryUrl: https://github.com/mohdaliiqbal/data-foundation-gen-ai-aws-vector-stores
 
   NotebookInstance:
     Type: AWS::SageMaker::NotebookInstance
@@ -201,8 +201,8 @@ Resources:
         Enabled: True
         InternalUserDatabaseEnabled: True
         MasterUserOptions:
-          MasterUserName: !Sub ${OpenSearchUsername}
-          MasterUserPassword: !Sub ${OpenSearchPassword}
+          MasterUserName: !Sub ${DBUsername}
+          MasterUserPassword: !Sub ${DBPassword}
       NodeToNodeEncryptionOptions:
         Enabled: True
       EncryptionAtRestOptions:
@@ -210,6 +210,56 @@ Resources:
         KmsKeyId: alias/aws/es
       DomainEndpointOptions:
         EnforceHTTPS: True
+
+  RDSSQLServerInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: rds-sql-server-instance
+      LicenseModel: "license-included"
+      Engine: "sqlserver-ee"
+      MultiAZ: false
+      BackupRetentionPeriod: 1
+      EnablePerformanceInsights: true
+      PerformanceInsightsRetentionPeriod: 7
+      DBInstanceClass: "db.r6i.2xlarge"
+      StorageType: io1
+      Iops: 2000
+      AllocatedStorage: 100
+      MaxAllocatedStorage: 1000
+      StorageEncrypted: true
+      CACertificateIdentifier: rds-ca-rsa2048-g1
+      EngineVersion: 15.00.4355.3.v1
+      MasterUsername: !Sub ${DBUsername}
+      MasterUserPassword: !Sub ${DBPassword}
+      PubliclyAccessible: false
+
+  AuroraDBCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Delete
+    Properties:
+      Engine: aurora-postgresql
+      EngineVersion: 16.2
+      DBClusterIdentifier: genai-aurora-cluster
+      DatabaseName: vectordb
+      Port: 5432
+      MasterUsername: !Sub ${DBUsername}
+      MasterUserPassword:  !Sub ${DBPassword}
+      StorageEncrypted:  True
+      EnableIAMDatabaseAuthentication: False
+      DeletionProtection: False
+  
+  AuroraDBFirstInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceClass: 'db.r6g.2xlarge'
+      DBClusterIdentifier: !Ref AuroraDBCluster
+      DBInstanceIdentifier: genai-aurora-instance1
+      Engine: aurora-postgresql
+      EngineVersion: 16.2
+      AutoMinorVersionUpgrade: False
+      PubliclyAccessible: False
+      EnablePerformanceInsights: True
+      PerformanceInsightsRetentionPeriod: 7
 
 Outputs:
 
@@ -231,6 +281,20 @@ Outputs:
       - - 'https://'
         - !GetAtt OpenSearchServiceDomain.DomainEndpoint
         - '/_dashboards'
+
+  RDSSQLServerEndpoint:
+    Description: RDS SQL Server instance endpoint
+    Value:
+      'Fn::GetAtt':
+        - RDSSQLServerInstance
+        - Endpoint.Address
+
+  AuroraDBClusterEndpoint:
+    Description: Aurora DB Cluster Endpoint
+    Value:
+      'Fn::GetAtt':
+        - AuroraDBCluster
+        - Endpoint.Address
 
   Region:
     Description: Deployed Region
@@ -263,9 +327,9 @@ Outputs:
         - !GetAtt NotebookInstance.NotebookInstanceName
         - '?view=classic'
 
-  OpenSearchSecret:
-    Description: Name of the OpenSearch secret in Secrets Manager
-    Value: !Ref OpenSearchSecret
+  DBSecret:
+    Description: Name of the DB secret in Secrets Manager
+    Value: !Ref DBSecret
 
   BedrockBatchInferenceRole:
     Description: Bedrock batch inference role

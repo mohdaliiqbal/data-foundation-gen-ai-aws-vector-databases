@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Template to provision OpenSearch cluster and SageMaker Notebook for semantic search
+Description: Template to provision OpenSearch, Aurora, SQL Server, DocumentDB clusters and SageMaker Notebook for semantic search lab
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -34,10 +34,96 @@ Parameters:
     Type: String
     Default: Semantic123!
 
-
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: '10.30.0.0/16'
+    PublicOne:
+      CIDR: '10.30.0.0/24'
+    PrivateOne:
+      CIDR: '10.30.100.0/24'
+    PrivateTwo:
+      CIDR: '10.30.101.0/24'
+    PrivateThree:
+      CIDR: '10.30.102.0/24'
 
 Resources:
 
+# Networking
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+      
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref VPC
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref VPC
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref VPC
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${AWS::StackName}-igw
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetOneRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTable
+
+  DocumentDBSubnetGroup:
+    Type: AWS::DocDB::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: Subnet Group for DocumentDB
+      DBSubnetGroupName: !Sub ${AWS::StackName}-SG-DocumentDB
+      SubnetIds: 
+         - !Ref PrivateSubnetOne
+         - !Ref PrivateSubnetTwo
+         
   DBSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -57,6 +143,10 @@ Resources:
       NotebookInstanceName: data-foundation-genai-nb
       InstanceType: ml.m5d.2xlarge
       RoleArn: !GetAtt NBRole.Arn
+      DirectInternetAccess: Enabled
+      SubnetId: !Ref PublicSubnetOne
+      SecurityGroupIds: 
+        - !Ref NotebookSecurityGroup
       VolumeSizeInGB : 200
       DefaultCodeRepository: !GetAtt CodeRepository.CodeRepositoryName
 
@@ -261,6 +351,61 @@ Resources:
       EnablePerformanceInsights: True
       PerformanceInsightsRetentionPeriod: 7
 
+  DocumentDBCluster:
+    Type: "AWS::DocDB::DBCluster"
+    DeletionPolicy: Delete
+    Properties:
+      DBClusterIdentifier: !Sub ${AWS::StackName}-genai-docdb-cluster
+      MasterUsername: !Sub ${DBUsername}
+      MasterUserPassword: !Sub ${DBPassword}
+      DBSubnetGroupName : !Ref DocumentDBSubnetGroup
+      EngineVersion: 5.0.0
+      VpcSecurityGroupIds: 
+        - Fn::GetAtt:
+            - DocumentDBSecurityGroup
+            - GroupId
+    DependsOn: DocumentDBSecurityGroup
+
+  DocumentDBInstance:
+    Type: "AWS::DocDB::DBInstance"
+    Properties:
+      DBClusterIdentifier: !Ref DocumentDBCluster
+      DBInstanceIdentifier: genai-docdb-instance1
+      DBInstanceClass: 'db.r6g.2xlarge'
+    DependsOn: DocumentDBCluster  
+
+  # Notebook Security Group
+  NotebookSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Sagemaker notebook Security Group
+      GroupName: !Sub ${AWS::StackName}-SG-notebook
+      VpcId: !Ref VPC
+      
+  # DocumentDB Security Group
+  DocumentDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupDescription: Amazon DocumentDB Security Group
+      GroupName: !Sub ${AWS::StackName}-SG-docDB
+      VpcId: !Ref VPC
+
+  InboundRule:  
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:   
+      IpProtocol: tcp
+      FromPort: 27017
+      ToPort: 27017
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+          - NotebookSecurityGroup
+          - GroupId
+      GroupId:
+        Fn::GetAtt:
+          - DocumentDBSecurityGroup
+          - GroupId
+
+
 Outputs:
 
   OpenSearchDomainEndpoint:
@@ -295,6 +440,10 @@ Outputs:
       'Fn::GetAtt':
         - AuroraDBCluster
         - Endpoint.Address
+        
+  DocumentDBClusterEndpoint:
+    Description: DocumentDB Cluster Endpoint
+    Value: !GetAtt DocumentDBCluster.Endpoint
 
   Region:
     Description: Deployed Region

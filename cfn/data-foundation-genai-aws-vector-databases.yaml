@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: Template to provision OpenSearch, Aurora, SQL Server, DocumentDB clusters and SageMaker Notebook for semantic search lab
+Description: Template to provision OpenSearch, Aurora, SQL Server, DocumentDB, MemoryDB clusters and SageMaker Notebook for semantic search lab
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -124,6 +124,15 @@ Resources:
          - !Ref PrivateSubnetOne
          - !Ref PrivateSubnetTwo
          
+  MemoryDBSubnetGroup:
+    Type: AWS::MemoryDB::SubnetGroup
+    Properties:
+      SubnetGroupName: !Sub ${AWS::StackName}-memorydb-subnet-group
+      Description: Subnet group for MemoryDB
+      SubnetIds:
+        - !Ref PrivateSubnetOne
+        - !Ref PrivateSubnetTwo
+
   DBSecret:
     Type: AWS::SecretsManager::Secret
     Properties:
@@ -374,6 +383,23 @@ Resources:
       DBInstanceClass: 'db.r6g.2xlarge'
     DependsOn: DocumentDBCluster  
 
+
+  # MemoryDB Cluster
+  MemoryDBCluster:
+    Type: AWS::MemoryDB::Cluster
+    Properties:
+      ClusterName: genai-memorydb-cluster
+      NodeType: 'db.r6g.2xlarge'
+      NumShards: 1
+      NumReplicasPerShard: 1
+      SubnetGroupName: !Ref MemoryDBSubnetGroup
+      ACLName: open-access
+      SecurityGroupIds:
+        - !Ref MemoryDBSecurityGroup
+      TLSEnabled: true
+      EngineVersion: '7.1'
+      ParameterGroupName: default.memorydb-redis7.search.preview
+
   # Notebook Security Group
   NotebookSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -390,7 +416,7 @@ Resources:
       GroupName: !Sub ${AWS::StackName}-SG-docDB
       VpcId: !Ref VPC
 
-  InboundRule:  
+  DocumentDBInboundRule:  
     Type: AWS::EC2::SecurityGroupIngress
     Properties:   
       IpProtocol: tcp
@@ -405,6 +431,28 @@ Resources:
           - DocumentDBSecurityGroup
           - GroupId
 
+  # MemoryDB Security Group
+  MemoryDBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for MemoryDB
+      GroupName: !Sub ${AWS::StackName}-SG-MemoryDB
+      VpcId: !Ref VPC
+
+  MemoryDBInboundRule:  
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:   
+      IpProtocol: tcp
+      FromPort: 6379
+      ToPort: 6379
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+          - NotebookSecurityGroup
+          - GroupId
+      GroupId:
+        Fn::GetAtt:
+          - MemoryDBSecurityGroup
+          - GroupId
 
 Outputs:
 
@@ -444,6 +492,10 @@ Outputs:
   DocumentDBClusterEndpoint:
     Description: DocumentDB Cluster Endpoint
     Value: !GetAtt DocumentDBCluster.Endpoint
+
+  MemoryDBClusterEndpoint:
+    Description: MemoryDB Cluster Endpoint
+    Value: !GetAtt MemoryDBCluster.ClusterEndpoint.Address
 
   Region:
     Description: Deployed Region
